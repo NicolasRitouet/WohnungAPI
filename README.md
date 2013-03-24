@@ -4,8 +4,8 @@ Wohnung API
 My own home automation system, based on arduino.  
 Plan is:  
 A) in each room, a module that transmit temperature and motion detection.  
-This module will be composed of:
- - a attiny 85
+Each module will be composed of:
+- a attiny 85
 - a dht22 (temperature and humidity sensor)
 - a pir motion detection sensor (HC-SR501)
 - a wireless transmitter (433mhz) 
