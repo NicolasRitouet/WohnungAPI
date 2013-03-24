@@ -12,12 +12,12 @@ DHT dht(dhtPin, dhtType);
 RCSwitch mySwitch = RCSwitch();
 
 unsigned long previousTemperatureReading = 0;
-unsigned long readTemperatureInterval = 2000;
+unsigned long readTemperatureInterval = 20000;
 
-boolean isMoving = false; //has there been movement in the last 5 seconds
-boolean sendMoving = false; //has there been a message about movement sent
-unsigned long startTime; //start time in millis of timer
-boolean timerStarted = false; //has the timer been started
+unsigned long motionStarted = 0;
+unsigned long motionSendMinimumInterval = 5000;
+boolean clearMotionStarted = false;
+boolean isMoving = false;
 
 void setup() {
 
@@ -25,7 +25,7 @@ void setup() {
 
   pinMode(pirPin, INPUT);
   Serial.println("Calibrating PIR Sensor: ");
-  for(int i = 0; i < 30; i++) {
+  for(int i = 0; i < 45; i++) {
     Serial.print(".");
     delay(1000);
   }
@@ -46,27 +46,38 @@ void loop() {
     previousTemperatureReading = currentMillis;
     readTemperature();  
   }
-  //nothing happens until interrupt
-  while (isMoving) {
-    if(sendMoving) { //only send message once
-      Serial.println("Motion Detected!"); //prints motion once
-      sendMoving = false;
-    }
-    if (digitalRead(pirPin) == LOW && lowTimer() == true) { //if no movement and over five seconds on timer
-      Serial.println("Motion Stopped.");
-      attachInterrupt(pirInterruptPin, motionDetected, RISING);//reattach interrupt
-    }else {
-       Serial.println("Motion Continues.");
+
+  if (isMoving) {
+    if(currentMillis - motionStarted > motionSendMinimumInterval) {
+      motionStarted = currentMillis;
+      log(" SEND MOTION !!!");
+      clearMotionStarted = true;
     }
   }
 }
 
-void motionDetected() {
-  Serial.println("ENTER motionDetected");
-  isMoving = true;
-  sendMoving = true;
+void motionStopped() {
+  log(" ENTER motionStopped");
+  isMoving = false;
   EIFR = _BV (INTF0);  // clear flag for interrupt 0
   detachInterrupt(pirInterruptPin); //detach for movement timing phase
+  EIFR = _BV (INTF0);  // clear flag for interrupt 0
+  attachInterrupt(pirInterruptPin, motionDetected, RISING); //sets interrupt to RISING, calls motionDetected when interrupted
+}
+
+void motionDetected() {
+  if (clearMotionStarted || motionStarted == 0) {
+    log("clear motion start !");
+    motionStarted = millis();
+    clearMotionStarted = false;
+  }
+  log(" ENTER motionDetected");
+  isMoving = true;
+  EIFR = _BV (INTF0);  // clear flag for interrupt 0
+  detachInterrupt(pirInterruptPin); //detach for movement timing phase
+
+  EIFR = _BV (INTF0);  // clear flag for interrupt 0
+  attachInterrupt(pirInterruptPin, motionStopped, FALLING);
 }
 
 void readTemperature() {
@@ -79,8 +90,10 @@ void readTemperature() {
   if (isnan(t) || isnan(h)) {
     Serial.println("Failed to read from DHT");
     mySwitch.send("000000000001010100010001");
-  } else {
-    Serial.print("Humidity: "); 
+  } 
+  else {
+    Serial.print(millis());
+    Serial.print(" Humidity: "); 
     Serial.print(h);
     Serial.print(" %\t");
     Serial.print("Temperature: "); 
@@ -90,23 +103,8 @@ void readTemperature() {
   }
 }
 
-boolean lowTimer() {
-  Serial.println("ENTER lowTimer");
-
-  while (digitalRead(pirPin) == LOW) {
-    if (timerStarted == false) { //start timer once
-      startTime = millis();
-      timerStarted = true;
-    } else if (timerStarted == true && (millis()-startTime) > 5000) { //if the timer has gone for five seconds
-      isMoving = false;
-      timerStarted = false;
-      Serial.println("EXIT lowTimer and reset isMoving");
-      return true;
-    }
-  }
-  //if movement occurs during the timing, exit and reset timer
-  timerStarted = false;
-  Serial.println("EXIT lowTimer");
-  return false;
+void log(String logMessage) {
+  Serial.print(millis()/100);
+  Serial.print(" - ");
+  Serial.println(logMessage);
 }
-
