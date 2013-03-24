@@ -2,7 +2,7 @@
 #include <RCSwitch.h>
 
 #define dhtPin 12
-#define rcSwitchPin 4
+#define rcSwitchPin 3
 #define pirPin 2
 #define pirInterruptPin 0
 
@@ -17,7 +17,11 @@ unsigned long readTemperatureInterval = 20000;
 unsigned long motionStarted = 0;
 unsigned long motionSendMinimumInterval = 5000;
 boolean clearMotionStarted = false;
-boolean isMoving = false;
+
+boolean isMoving = false; //has there been movement in the last 5 seconds
+boolean sendMoving = false; //has there been a message about movement sent
+unsigned long startTime; //start time in millis of timer
+boolean timerStarted = false; //has the timer been started
 
 void setup() {
 
@@ -25,7 +29,7 @@ void setup() {
 
   pinMode(pirPin, INPUT);
   Serial.println("Calibrating PIR Sensor: ");
-  for(int i = 0; i < 45; i++) {
+  for(int i = 0; i < 5; i++) {
     Serial.print(".");
     delay(1000);
   }
@@ -49,9 +53,10 @@ void loop() {
 
   if (isMoving) {
     if(currentMillis - motionStarted > motionSendMinimumInterval) {
-      motionStarted = currentMillis;
       log(" SEND MOTION !!!");
+      mySwitch.send(111111, 24);
       clearMotionStarted = true;
+      motionStarted = currentMillis;
     }
   }
 }
@@ -59,6 +64,7 @@ void loop() {
 void motionStopped() {
   log(" ENTER motionStopped");
   isMoving = false;
+  sendMoving = true;
   EIFR = _BV (INTF0);  // clear flag for interrupt 0
   detachInterrupt(pirInterruptPin); //detach for movement timing phase
   EIFR = _BV (INTF0);  // clear flag for interrupt 0
@@ -73,6 +79,7 @@ void motionDetected() {
   }
   log(" ENTER motionDetected");
   isMoving = true;
+  sendMoving = true;
   EIFR = _BV (INTF0);  // clear flag for interrupt 0
   detachInterrupt(pirInterruptPin); //detach for movement timing phase
 
@@ -108,3 +115,5 @@ void log(String logMessage) {
   Serial.print(" - ");
   Serial.println(logMessage);
 }
+
+
