@@ -18,4 +18,4 @@ This module is composed of:
 - a lipo charger (in case of power outage)
 - a lipo battery
 
-Trello board: https://trello.com/board/wohnung-api
+Trello board: https://trello.com/board/wohnung-api/5158bb5a168722034a00398a
